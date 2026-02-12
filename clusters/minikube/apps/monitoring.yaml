@@ -1,0 +1,57 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://victoriametrics.github.io/helm-charts/
+    chart: victoria-metrics-k8s-stack
+    targetRevision: 0.63.5
+    helm:
+      releaseName: vmstack
+      valueFiles:
+        - values.yaml
+      values: |
+        fullnameOverride: vmstack
+
+        # Grafana + дефолтні дашборди увімкнені (за замовчуванням chart їх ставить через sidecar)  [oai_citation:3‡docs.victoriametrics.com](https://docs.victoriametrics.com/helm/victoria-metrics-k8s-stack/)
+        defaultDashboards:
+          enabled: true
+          annotations:
+            # корисно для великих dashboard-configmaps в ArgoCD  [oai_citation:4‡docs.victoriametrics.com](https://docs.victoriametrics.com/helm/victoria-metrics-k8s-stack/)
+            argocd.argoproj.io/sync-options: ServerSideApply=true
+
+        grafana:
+          enabled: true
+          adminPassword: admin
+          sidecar:
+            dashboards:
+              enabled: true
+              label: grafana_dashboard
+              labelValue: "1"
+            datasources:
+              enabled: true
+
+        # Локально: можна без persistent storage для простоти
+        vmsingle:
+          enabled: true
+          spec:
+            retentionPeriod: "1d"
+            storage:
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 5Gi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

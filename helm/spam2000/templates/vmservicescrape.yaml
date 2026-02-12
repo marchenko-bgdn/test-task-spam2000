@@ -1,0 +1,18 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: spam2000
+  labels:
+    app.kubernetes.io/name: spam2000
+spec:
+  jobLabel: app.kubernetes.io/name
+  namespaceSelector:
+    matchNames:
+      - apps
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spam2000
+  endpoints:
+    - port: http
+      path: {{ .Values.metrics.path | quote }}
+      interval: {{ .Values.metrics.interval | quote }}
