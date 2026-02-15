@@ -1,0 +1,6 @@
+apiVersion: v2
+name: spam2000
+description: spam2000 app + Service + VMServiceScrape
+type: application
+version: 0.1.0
+appVersion: "1.1394.355"

@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: spam2000
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/marchenko-bgdn/test-task-spam2000.git
+    targetRevision: main
+    path: helm/spam2000
+    helm:
+      releaseName: spam2000
+      values: |
+        image:
+          repository: antonzlydenkouni/spam2000
+          digest: "sha256:950b214274394c996d1a55db8a81b07d4fef09d0fa61cde3e437cec2f4d33b01"
+        replicaCount: 1
+        service:
+          port: 8080
+        metrics:
+          path: /metrics
+          interval: 10s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: apps
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

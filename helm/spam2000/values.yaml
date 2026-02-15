@@ -1,0 +1,13 @@
+replicaCount: 1
+
+image:
+  repository: andriiuni/spam2000
+  tag: "1.1394.355"
+  pullPolicy: IfNotPresent
+
+service:
+  port: 8080
+
+metrics:
+  path: /metrics
+  interval: 10s
