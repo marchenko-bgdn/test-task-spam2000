@@ -15,8 +15,8 @@ spec:
       releaseName: spam2000
       values: |
         image:
-          repository: andriiuni/spam2000
-          tag: "1.1394.355"
+          repository: antonzlydenkouni/spam2000
+          digest: "sha256:950b214274394c996d1a55db8a81b07d4fef09d0fa61cde3e437cec2f4d33b01"
         replicaCount: 1
         service:
           port: 8080

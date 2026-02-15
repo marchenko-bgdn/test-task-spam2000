@@ -6,7 +6,6 @@ metadata:
   labels:
     grafana_dashboard: "1"
   annotations:
-    # small dashboard, але корисно як патерн для ArgoCD  [oai_citation:8‡docs.victoriametrics.com](https://docs.victoriametrics.com/helm/victoria-metrics-k8s-stack/)
     argocd.argoproj.io/sync-options: ServerSideApply=true
 data:
   spam2000.json: |-

@@ -3,7 +3,7 @@ set -euo pipefail
 
 PROFILE="${MINIKUBE_PROFILE:-minikube}"
 CPUS="${MINIKUBE_CPUS:-4}"
-MEMORY="${MINIKUBE_MEMORY:-7680}"   # під Docker Desktop часто треба < 8GB
+MEMORY="${MINIKUBE_MEMORY:-7680}"
 DISK="${MINIKUBE_DISK:-30g}"
 
 ARGOCD_NS="argocd"
