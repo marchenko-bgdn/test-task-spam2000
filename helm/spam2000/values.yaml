@@ -3,6 +3,7 @@ replicaCount: 1
 image:
   repository: andriiuni/spam2000
   tag: "1.1394.355"
+  digest: ""
   pullPolicy: IfNotPresent
 
 service:
