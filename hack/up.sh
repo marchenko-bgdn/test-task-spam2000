@@ -9,16 +9,19 @@ DISK="${MINIKUBE_DISK:-30g}"
 ARGOCD_NS="argocd"
 MON_NS="monitoring"
 
-# UI ports (can override: ARGOCD_PORT=18080 GRAFANA_PORT=13000 make up)
+# UI ports
 ARGOCD_PORT="${ARGOCD_PORT:-8080}"
 GRAFANA_PORT="${GRAFANA_PORT:-3000}"
 
-# Where we store background port-forward pids/logs
+# Port-forward pids and logs
 PF_DIR="${PF_DIR:-.portforwards}"
 
 ARGO_HELM_REPO="https://argoproj.github.io/argo-helm"
 ARGO_CHART="argo/argo-cd"
 ARGO_CHART_VERSION="${ARGOCD_CHART_VERSION:-9.4.1}"
+
+
+GRAFANA_SVC="${GRAFANA_SVC:-vmstack-grafana}"
 
 info() { echo -e "\n==> $*"; }
 die() { echo "ERROR: $*" >&2; exit 1; }
@@ -88,6 +91,20 @@ wait_svc_exists() {
   done
 }
 
+wait_secret_exists() {
+  local ns="$1"; local secret="$2"; local timeout="${3:-300}"
+  info "Waiting for secret ${ns}/${secret} to exist..."
+  local start; start="$(date +%s)"
+  while true; do
+    if kubectl -n "$ns" get secret "$secret" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+    local now; now="$(date +%s)"
+    (( now - start > timeout )) && return 1
+  done
+}
+
 wait_argocd_app() {
   local app="$1"
   local timeout="${2:-600}"
@@ -109,22 +126,11 @@ wait_argocd_app() {
     sleep 2
     local now; now="$(date +%s)"
     if (( now - start > timeout )); then
-      echo "WARNING: Timeout waiting for app '${app}'. Current:"
+      echo "Timeout waiting for app '${app}'. Current:"
       kubectl -n "${ARGOCD_NS}" get application "${app}" -o wide || true
       return 1
     fi
   done
-}
-
-find_grafana_service() {
-  # Prefer a labeled grafana service, fall back to name match
-  local svc=""
-  svc="$(kubectl -n "${MON_NS}" get svc -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
-  if [[ -z "${svc}" ]]; then
-    svc="$(kubectl -n "${MON_NS}" get svc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' \
-      | grep -i grafana | head -n 1 || true)"
-  fi
-  echo "${svc}"
 }
 
 get_argocd_password() {
@@ -133,15 +139,13 @@ get_argocd_password() {
 }
 
 get_grafana_password() {
-  # If chart created a secret, use it. Otherwise fall back to 'admin'
-  local pw=""
-  # common secret names vary; try label first
-  local secret
+  local secret pw
   secret="$(kubectl -n "${MON_NS}" get secret -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
-  if [[ -n "${secret}" ]]; then
-    pw="$(kubectl -n "${MON_NS}" get secret "${secret}" -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d || true)"
-  fi
-  echo "${pw:-admin}"
+  [[ -n "${secret}" ]] || return 1
+
+  pw="$(kubectl -n "${MON_NS}" get secret "${secret}" -o jsonpath="{.data['admin-password']}" 2>/dev/null | base64 -d || true)"
+  [[ -n "${pw}" ]] || return 1
+  echo "${pw}"
 }
 
 info "Checking prerequisites"
@@ -186,23 +190,23 @@ wait_argocd_app "spam2000" 600
 # Start port-forwards
 start_port_forward "argocd" "${ARGOCD_NS}" "svc/argocd-server" "${ARGOCD_PORT}:443"
 
-# Wait for Grafana service then port-forward it
-GRAFANA_SVC=""
-for _ in {1..180}; do
-  GRAFANA_SVC="$(find_grafana_service)"
-  [[ -n "${GRAFANA_SVC}" ]] && break
+# Grafana service is stable in your setup
+wait_svc_exists "${MON_NS}" "${GRAFANA_SVC}" 600
+start_port_forward "grafana" "${MON_NS}" "svc/${GRAFANA_SVC}" "${GRAFANA_PORT}:80"
+
+# Read credentials
+ARGO_PWD="$(get_argocd_password)"
+
+info "Resolving Grafana admin password from Secret"
+GRAF_PWD=""
+for _ in {1..300}; do
+  if GRAF_PWD="$(get_grafana_password 2>/dev/null)"; then
+    break
+  fi
   sleep 2
 done
 
-if [[ -z "${GRAFANA_SVC}" ]]; then
-  echo "WARNING: Grafana service not found yet in namespace '${MON_NS}'."
-  echo "Check: kubectl -n ${MON_NS} get pods,svc"
-else
-  start_port_forward "grafana" "${MON_NS}" "svc/${GRAFANA_SVC}" "${GRAFANA_PORT}:80"
-fi
-
-ARGO_PWD="$(get_argocd_password)"
-GRAF_PWD="$(get_grafana_password)"
+[[ -n "${GRAF_PWD}" ]] || die "Grafana password was not found in a Secret. Check: kubectl -n ${MON_NS} get secret -l app.kubernetes.io/name=grafana -o yaml"
 
 echo
 echo "==================== ACCESS ===================="

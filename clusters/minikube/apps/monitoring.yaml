@@ -25,7 +25,6 @@ spec:
 
         grafana:
           enabled: true
-          adminPassword: admin
           sidecar:
             dashboards:
               enabled: true
